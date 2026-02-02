@@ -1,19 +1,18 @@
-# Run Subscription Payments with the Stripe Firebase Extension
+# Firebase Hosting CICD Dashboard (T3 Frontend)
 
-This is an example web client for usage with the [Stripe Subscriptions Firebase Extension](https://firebase.google.com/products/extensions/firestore-stripe-subscriptions).
+This project provides a T3-style frontend for uploading website ZIP files,
+versioning releases, and queueing Firebase Hosting deployments.
 
 **Features:**
 
-- Renders product and pricing details from your Cloud Firestore.
-- Creates Stripe Checkout Sessions to start subscriptions for your customers.
-- Syncs your subscription statuses with Firebase Authentication for access control management.
-- Gives your users access to the Stripe Customer Portal.
+- Upload website ZIPs from the browser.
+- Store artifacts in Firebase Storage and release metadata in Firestore.
+- Track deployment steps (upload, Git versioning, re-zip, deploy).
+- Designed as a T3-style Next.js frontend you can extend with APIs or CI workers.
 
 ## Demo
 
-- https://stripe-subs-ext.web.app/
-
-The design for Stripe Checkout and the customer portal can be customized in your Stripe Dashboard [branding settings](https://dashboard.stripe.com/settings/branding). See this example which is customized to match the Firebase color scheme:
+- Update with your Firebase Hosting URL once deployed.
 
 ## Setup
 
@@ -23,32 +22,33 @@ If you haven't already, [install the Firebase CLI](https://firebase.google.com/d
 npm install -g firebase-tools
 ```
 
-### Install and configure the Firebase Extension
+### Configure Firebase
 
-1. Install the [Stripe Subscriptions Firebase Extension](https://firebase.google.com/products/extensions/firestore-stripe-subscriptions).
-2. Configure the extension in your Firebase Console.
+- Enable Firebase Authentication (Anonymous provider).
+- Create Firestore and Storage instances for your project.
 
-### Configure the example web client
+### Configure the T3 frontend
 
-- In the [/public/javascript/app.js](/public/javascript/app.js) file set your
-  - `STRIPE_PUBLISHABLE_KEY` from the [Stripe Dashboard](https://dashboard.stripe.com/apikeys).
-  - `taxRates` array from the [Stripe Dashboard](https://dashboard.stripe.com/tax-rates).
-  - `firebaseConfig` object from your Firebase console project settings.
-  - `functionLocation` from your Cloud Functions location setting.
+- Set the Firebase environment variables in a `.env.local` file:
+  - `NEXT_PUBLIC_FIREBASE_API_KEY`
+  - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+  - `NEXT_PUBLIC_FIREBASE_DATABASE_URL`
+  - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+  - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+  - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+  - `NEXT_PUBLIC_FIREBASE_APP_ID`
+- The deployment UI stores ZIP artifacts in Firebase Storage and release metadata
+  in Firestore under `cicdDeployments/{uid}/versions`.
 
 ## Run locally
 
 ```bash
-firebase serve --project {your Firebase project name}
-# or
 npm run dev
 ```
 
 ## Deploy to Firebase Hosting
 
 ```bash
-firebase deploy
-# or
 npm run deploy
 ```
 
