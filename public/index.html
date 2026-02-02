@@ -39,6 +39,52 @@
         <h3>View invoices, update subscription & payment methods</h3>
         <button id="billing-portal-button">Access customer portal</button>
       </section>
+      <section id="cicd">
+        <h2>Website deployment pipeline</h2>
+        <p>
+          Upload a website ZIP and the pipeline will version the contents in
+          Git, re-zip the build, and deploy to Firebase Hosting. Status updates
+          below track each release.
+        </p>
+        <form id="deploy-form">
+          <label for="deploy-zip">Website ZIP file</label>
+          <input id="deploy-zip" name="deploy-zip" type="file" accept=".zip" />
+          <label for="deploy-message">Release notes</label>
+          <textarea
+            id="deploy-message"
+            name="deploy-message"
+            rows="3"
+            placeholder="Describe what changed in this release"
+          ></textarea>
+          <button type="submit" id="deploy-button">Deploy to Firebase</button>
+          <p id="deploy-status" role="status" aria-live="polite"></p>
+        </form>
+        <div class="pipeline">
+          <div class="pipeline-step">
+            <span>1</span>
+            <div>
+              <h3>Upload ZIP</h3>
+              <p>Store the raw archive in Firebase Storage.</p>
+            </div>
+          </div>
+          <div class="pipeline-step">
+            <span>2</span>
+            <div>
+              <h3>Unzip & version</h3>
+              <p>Unpack, commit the website to Git, and tag a release.</p>
+            </div>
+          </div>
+          <div class="pipeline-step">
+            <span>3</span>
+            <div>
+              <h3>Re-zip & deploy</h3>
+              <p>Repackage the versioned site and deploy to Hosting.</p>
+            </div>
+          </div>
+        </div>
+        <h3>Release history</h3>
+        <ul id="deployment-versions" class="deployment-list"></ul>
+      </section>
     </main>
 
     <footer>
@@ -66,6 +112,22 @@
       </div>
     </template>
 
+    <template id="deployment-item">
+      <li class="deployment-item">
+        <div class="deployment-header">
+          <div>
+            <h4 class="deployment-title">Version</h4>
+            <p class="deployment-meta"></p>
+          </div>
+          <a class="deployment-download" target="_blank" rel="noopener"
+            >Download ZIP</a
+          >
+        </div>
+        <p class="deployment-notes"></p>
+        <ul class="deployment-steps"></ul>
+      </li>
+    </template>
+
     <!-- Insert these scripts at the bottom of the HTML, but before you use any Firebase services -->
 
     <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
@@ -78,6 +140,7 @@
     <!-- Add Firebase products that you want to use -->
     <script src="https://www.gstatic.com/firebasejs/7.14.5/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/7.14.5/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.14.5/firebase-storage.js"></script>
 
     <script src="https://cdn.firebase.com/libs/firebaseui/3.5.2/firebaseui.js"></script>
     <link

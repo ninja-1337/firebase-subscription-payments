@@ -17,6 +17,11 @@ const functionLocation = 'us-east1';
 // Initialize Firebase
 const firebaseApp = firebase.initializeApp(firebaseConfig);
 const db = firebaseApp.firestore();
+const storage = firebaseApp.storage();
+
+let currentUser = null;
+let deploymentListenerUnsubscribe = null;
+let deployFormInitialized = false;
 
 /**
  * Firebase Authentication configuration
@@ -52,6 +57,7 @@ firebase.auth().onAuthStateChanged((firebaseUser) => {
     document.querySelector('main').style.display = 'block';
     currentUser = firebaseUser.uid;
     startDataListeners();
+    startDeploymentPipeline();
   } else {
     document.querySelector('main').style.display = 'none';
     firebaseUI.start('#firebaseui-auth-container', firebaseUiConfig);
@@ -142,6 +148,170 @@ function startDataListeners() {
         priceData.interval
       }, giving you the role: ${await getCustomClaimRole()}. 🥳`;
     });
+}
+
+/**
+ * CICD deployment pipeline
+ */
+function startDeploymentPipeline() {
+  const form = document.querySelector('#deploy-form');
+  const versionsList = document.querySelector('#deployment-versions');
+
+  if (!deployFormInitialized) {
+    form.addEventListener('submit', handleDeploymentSubmit);
+    deployFormInitialized = true;
+  }
+
+  if (deploymentListenerUnsubscribe) {
+    deploymentListenerUnsubscribe();
+  }
+
+  deploymentListenerUnsubscribe = getDeploymentCollection()
+    .orderBy('versionNumber', 'desc')
+    .onSnapshot((snapshot) => {
+      versionsList.innerHTML = '';
+      if (snapshot.empty) {
+        const emptyState = document.createElement('li');
+        emptyState.textContent = 'No releases yet. Upload a ZIP to deploy.';
+        emptyState.classList.add('deployment-item');
+        versionsList.appendChild(emptyState);
+        return;
+      }
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        versionsList.appendChild(renderDeploymentItem(data));
+      });
+    });
+}
+
+function getDeploymentCollection() {
+  return db
+    .collection('cicdDeployments')
+    .doc(currentUser)
+    .collection('versions');
+}
+
+async function handleDeploymentSubmit(event) {
+  event.preventDefault();
+  const status = document.querySelector('#deploy-status');
+  const fileInput = document.querySelector('#deploy-zip');
+  const notesInput = document.querySelector('#deploy-message');
+
+  if (!currentUser) {
+    status.textContent = 'Please sign in before deploying.';
+    return;
+  }
+
+  const file = fileInput.files[0];
+  if (!file) {
+    status.textContent = 'Select a ZIP file to deploy.';
+    return;
+  }
+
+  const isZip =
+    file.type.includes('zip') || file.name.toLowerCase().endsWith('.zip');
+  if (!isZip) {
+    status.textContent = 'Only ZIP files are supported for deployments.';
+    return;
+  }
+
+  status.textContent = 'Uploading ZIP to Firebase Storage...';
+
+  const collection = getDeploymentCollection();
+  const versionNumber = await getNextVersionNumber(collection);
+  const versionTag = `v${versionNumber}`;
+  const storageRef = storage
+    .ref()
+    .child(`deployments/${currentUser}/${versionTag}/${file.name}`);
+
+  await storageRef.put(file);
+  const downloadUrl = await storageRef.getDownloadURL();
+
+  const steps = [
+    { name: 'Upload ZIP', status: 'complete' },
+    { name: 'Unzip & version in Git', status: 'queued' },
+    { name: 'Re-zip & deploy to Firebase', status: 'queued' },
+  ];
+
+  await collection.add({
+    versionNumber,
+    versionTag,
+    fileName: file.name,
+    fileSize: file.size,
+    releaseNotes: notesInput.value.trim(),
+    downloadUrl,
+    steps,
+    status: 'queued',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+
+  status.textContent =
+    'Deployment queued. A CI worker can now unzip, version, and deploy.';
+  event.target.reset();
+}
+
+async function getNextVersionNumber(collection) {
+  const snapshot = await collection
+    .orderBy('versionNumber', 'desc')
+    .limit(1)
+    .get();
+  if (snapshot.empty) {
+    return 1;
+  }
+  const lastVersion = snapshot.docs[0].data().versionNumber || 0;
+  return lastVersion + 1;
+}
+
+function renderDeploymentItem(data) {
+  const template = document.querySelector('#deployment-item');
+  const fragment = template.content.cloneNode(true);
+  const title = fragment.querySelector('.deployment-title');
+  const meta = fragment.querySelector('.deployment-meta');
+  const download = fragment.querySelector('.deployment-download');
+  const notes = fragment.querySelector('.deployment-notes');
+  const steps = fragment.querySelector('.deployment-steps');
+
+  title.textContent = `${data.versionTag ?? 'Version'} · ${data.status ?? ''}`;
+  meta.textContent = [
+    data.fileName,
+    formatBytes(data.fileSize),
+    formatTimestamp(data.createdAt),
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
+  if (data.downloadUrl) {
+    download.href = data.downloadUrl;
+  } else {
+    download.remove();
+  }
+
+  notes.textContent = data.releaseNotes || 'No release notes provided.';
+
+  (data.steps || []).forEach((step) => {
+    const item = document.createElement('li');
+    item.textContent = `${step.name}: ${step.status}`;
+    steps.appendChild(item);
+  });
+
+  return fragment;
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(1)} ${units[index]}`;
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp || !timestamp.toDate) return '';
+  return timestamp.toDate().toLocaleString();
 }
 
 /**

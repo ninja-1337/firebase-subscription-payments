@@ -8,6 +8,8 @@ This is an example web client for usage with the [Stripe Subscriptions Firebase 
 - Creates Stripe Checkout Sessions to start subscriptions for your customers.
 - Syncs your subscription statuses with Firebase Authentication for access control management.
 - Gives your users access to the Stripe Customer Portal.
+- Includes a CICD-inspired deployment UI that uploads website ZIP files, records
+  release metadata, and queues deployment steps for Firebase Hosting.
 
 ## Demo
 
@@ -35,6 +37,8 @@ npm install -g firebase-tools
   - `taxRates` array from the [Stripe Dashboard](https://dashboard.stripe.com/tax-rates).
   - `firebaseConfig` object from your Firebase console project settings.
   - `functionLocation` from your Cloud Functions location setting.
+- The deployment UI stores ZIP artifacts in Firebase Storage and release metadata
+  in Firestore under `cicdDeployments/{uid}/versions`.
 
 ## Run locally
 
